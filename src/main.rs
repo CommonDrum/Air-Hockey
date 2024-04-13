@@ -7,15 +7,12 @@ pub const MAP_SIZE: i32 = 10;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_systems(Startup, ((spawn_player, spawn_camera).chain(), (generate_map, render_map).chain()))
+        .add_systems(Startup, (( spawn_camera).chain(), (generate_map, render_map).chain()))
         .add_systems(Update, player_movement)
         .run();
 }
 #[derive(Component)]
-struct Player{
-    x: i32,
-    y: i32,
-}
+struct Player;
 
 #[derive(Component)]
 struct Map{
@@ -33,11 +30,16 @@ fn generate_map(
 
     let tile_size = window.height() / MAP_SIZE as f32;
 
+    let player_spawn = Vec2::new(rand::thread_rng().gen_range(1..MAP_SIZE - 1) as f32, rand::thread_rng().gen_range(1..MAP_SIZE - 1) as f32);
+
     let mut map = vec![vec![0; MAP_SIZE as usize]; MAP_SIZE as usize];
     for y in 0..MAP_SIZE{
         for x in 0..MAP_SIZE{
             if x == 0 || x == MAP_SIZE - 1 || y == 0 || y == MAP_SIZE - 1{
                 map[y as usize][x as usize] = 1;
+            }
+            if x == player_spawn.x as i32 && y == player_spawn.y as i32{
+                map[y as usize][x as usize] = 2;
             }
         }
     }
@@ -55,6 +57,7 @@ fn render_map(
 
     let element_size = window.height() / map.map.len() as f32;
     let screen_offset = Vec2::new(window.width() / 2.0, window.height() / 2.0) - Vec2::new(element_size * map.map[0].len() as f32 / 2.0, element_size * map.map.len() as f32 / 2.0);
+    let mut player_pos = Vec2::ZERO;
 
     for (y, row) in map.map.iter().enumerate(){
         for (x, tile) in row.iter().enumerate(){
@@ -62,8 +65,10 @@ fn render_map(
             let y = y as f32 * element_size + screen_offset.y;
             
             let texture = match tile{
+
                 0 => continue,
                 1 => asset_server.load("tile_grey.png"),
+                2 => {player_pos += Vec2::new(x, y); continue;},
                 _ => asset_server.load("pink_body_circle.png"),
             };
 
@@ -73,35 +78,18 @@ fn render_map(
                 ..default()
             });
         }
+
+        commands.spawn((
+            SpriteBundle {
+                transform: Transform::from_xyz(player_pos.x + 16.0, player_pos.y + 16.0, 0.0),
+                texture: asset_server.load("player.png"),
+                ..default()
+            },
+            Player {},
+        ));
     }
 }
 
-
-fn spawn_player(
-    mut commands: Commands,
-    window_query: Query<&Window, With<PrimaryWindow>>,
-    asset_server: Res<AssetServer>,
-    map_query: Query<&Map>,
-) {
-    let window = window_query.get_single().unwrap();
-    let map= map_query.get_single().unwrap();
-
-    let x = rand::thread_rng().gen_range(1..MAP_SIZE - 1);
-    let y = rand::thread_rng().gen_range(1..MAP_SIZE - 1);
-
-    let transform = Transform::from_xyz((window.width() / 2.0, window.height() / 2.0, 0.0) + Vec3::new(x as f32 * map.tile_size, y as f32 * map.tile_size, 0.0);
-
-
-
-    commands.spawn((
-        SpriteBundle {
-            transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0),
-            texture: asset_server.load("player.png"),
-            ..default()
-        },
-        Player {x,y},
-    ));
-}
 
 fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>) {
     let window = window_query.get_single().unwrap();
@@ -114,15 +102,17 @@ fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<Primar
 
 
 
+
 fn player_movement(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut player_query: Query<&mut Transform, With<Player>>,
-    time: Res<Time>,
     window_query: Query<&Window, With<PrimaryWindow>>,
+    map_query: Query<&Map>
 ) {
     if let Ok(mut transform) = player_query.get_single_mut() {
         let window = window_query.get_single().unwrap();
-        let tile_size =  window.height() / 10.0;
+        let map = map_query.get_single().unwrap();
+        let tile_size = map.tile_size;
 
         let mut direction = Vec3::ZERO;
 
@@ -143,6 +133,6 @@ fn player_movement(
             direction = direction.normalize();
         }
 
-        transform.translation += direction * 10.0 * time.delta_seconds();
+        transform.translation += direction * tile_size;
     }
 }
