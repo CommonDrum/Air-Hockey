@@ -1,4 +1,4 @@
-use bevy::{asset, prelude::*, transform};
+use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use rand::Rng;
 
@@ -29,6 +29,8 @@ fn generate_map(
     let window = window_query.get_single().unwrap();
 
     let tile_size = window.height() / MAP_SIZE as f32;
+
+    println!("Tile size: {}", tile_size);
 
     let player_spawn = Vec2::new(rand::thread_rng().gen_range(1..MAP_SIZE - 1) as f32, rand::thread_rng().gen_range(1..MAP_SIZE - 1) as f32);
 
@@ -109,10 +111,10 @@ fn player_movement(
     window_query: Query<&Window, With<PrimaryWindow>>,
     map_query: Query<&Map>
 ) {
+    let map = map_query.get_single().unwrap();
+    let tile_size = map.tile_size;
+
     if let Ok(mut transform) = player_query.get_single_mut() {
-        let window = window_query.get_single().unwrap();
-        let map = map_query.get_single().unwrap();
-        let tile_size = map.tile_size;
 
         let mut direction = Vec3::ZERO;
 
@@ -133,6 +135,9 @@ fn player_movement(
             direction = direction.normalize();
         }
 
-        transform.translation += direction * tile_size;
+        
+
+        transform.translation += direction * tile_size * 10000.0;
     }
+
 }
