@@ -108,7 +108,6 @@ fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<Primar
 fn player_movement(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut player_query: Query<&mut Transform, With<Player>>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
     map_query: Query<&Map>
 ) {
     let map = map_query.get_single().unwrap();
@@ -135,7 +134,7 @@ fn player_movement(
             direction = direction.normalize();
         }
 
-        
+
 
         transform.translation += direction * tile_size * 10000.0;
     }
