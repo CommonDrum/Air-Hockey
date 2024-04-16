@@ -10,7 +10,7 @@ pub const INITIAL_ENEMY_COUNT: u32 = 5;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy, sound_setup))
+        .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy))
         .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies))
         .run();
 }
@@ -120,16 +120,19 @@ fn enemy_movement(
     for (mut transform, mut enemy) in enemy_query.iter_mut() {
         transform.translation += enemy.direction * ENEMY_SPEED * time.delta_seconds();
         if transform.translation.x < 0.0 || transform.translation.x > window.width() || transform.translation.y < 0.0 || transform.translation.y > window.height() {
+            
             if rand::thread_rng().gen_range(0.0..1.0) > 0.5 {
                 enemy.direction.x = -enemy.direction.x;
             } else {
                 enemy.direction.y = -enemy.direction.y;
             }
 
+            println!("Enemy out of bounds");
+
             commands.spawn((
                 AudioBundle {
                     source: asset_server.load("pluck.ogg"),
-                    settings: PlaybackSettings::ONCE,
+                    settings: PlaybackSettings::DESPAWN,
                 },
             ));
         }
@@ -162,39 +165,43 @@ fn confine_player(
 
 fn confine_enemies(
     mut enemy_query: Query<(&mut Transform, &mut Enemy)>,
-    window_query: Query<&Window, With<PrimaryWindow>>
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     let window = window_query.get_single().unwrap();
+
+    let mut colided = false;
 
     for (mut transform, mut enemy) in enemy_query.iter_mut() {
         if transform.translation.x + ENEMY_SIZE / 2.0 > window.width() {
             transform.translation.x = window.width() - ENEMY_SIZE / 2.0;
             enemy.direction.x = -enemy.direction.x;
+            colided = true;
         }
         if transform.translation.x - ENEMY_SIZE / 2.0 < 0.0 {
             transform.translation.x = ENEMY_SIZE / 2.0;
             enemy.direction.x = -enemy.direction.x;
+            colided = true;
         }
         if transform.translation.y + ENEMY_SIZE / 2.0 > window.height() {
             transform.translation.y = window.height() - ENEMY_SIZE / 2.0;
             enemy.direction.y = -enemy.direction.y;
+            colided = true;
         }
         if transform.translation.y - ENEMY_SIZE / 2.0 < 0.0 {
             transform.translation.y = ENEMY_SIZE / 2.0;
             enemy.direction.y = -enemy.direction.y;
+            colided = true;
         }
+
+        if colided {
+        commands.spawn((
+            AudioBundle {
+                source: asset_server.load("pluck.ogg"),
+                settings: PlaybackSettings::DESPAWN,
+            },
+        ));
+    }
     }
 }
-
-fn sound_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn((
-        AudioBundle {
-            source: asset_server.load("pluck.ogg"),
-            settings: PlaybackSettings::ONCE,
-        },
-    ));
-    
-}
-
-#[derive(Component)]
-struct MyMusic;
