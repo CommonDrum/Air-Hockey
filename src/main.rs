@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{audio, prelude::*};
 use bevy::window::PrimaryWindow;
 use rand::Rng;
 
@@ -10,7 +10,7 @@ pub const INITIAL_ENEMY_COUNT: u32 = 5;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy))
+        .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy, sound_setup))
         .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies))
         .run();
 }
@@ -110,9 +110,12 @@ fn player_movement(
 fn enemy_movement(
     mut enemy_query: Query<(&mut Transform, &mut Enemy)>,
     time: Res<Time>,
-    window_query: Query<&Window, With<PrimaryWindow>>
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     let window = window_query.get_single().unwrap();
+
     
     for (mut transform, mut enemy) in enemy_query.iter_mut() {
         transform.translation += enemy.direction * ENEMY_SPEED * time.delta_seconds();
@@ -122,7 +125,16 @@ fn enemy_movement(
             } else {
                 enemy.direction.y = -enemy.direction.y;
             }
+
+            commands.spawn((
+                AudioBundle {
+                    source: asset_server.load("pluck.ogg"),
+                    settings: PlaybackSettings::ONCE,
+                },
+            ));
         }
+
+           
     }
 }
 
@@ -173,3 +185,16 @@ fn confine_enemies(
         }
     }
 }
+
+fn sound_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn((
+        AudioBundle {
+            source: asset_server.load("pluck.ogg"),
+            settings: PlaybackSettings::ONCE,
+        },
+    ));
+    
+}
+
+#[derive(Component)]
+struct MyMusic;
