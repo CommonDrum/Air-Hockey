@@ -6,12 +6,12 @@ pub const PLAYER_SPEED: f32 = 500.0;
 pub const PLAYER_SIZE: f32 = 50.0;
 pub const ENEMY_SIZE: f32 = 50.0;
 pub const ENEMY_SPEED: f32 = 100.0;
-pub const INITIAL_ENEMY_COUNT: u32 = 225;
+pub const INITIAL_ENEMY_COUNT: u32 = 5;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy))
-        .add_systems(Update, (player_movement, enemy_movement))
+        .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies))
         .run();
 }
 #[derive(Component)]
@@ -122,6 +122,54 @@ fn enemy_movement(
             } else {
                 enemy.direction.y = -enemy.direction.y;
             }
+        }
+    }
+}
+
+fn confine_player(
+    mut player_query: Query<&mut Transform, With<Player>>,
+    window_query: Query<&Window, With<PrimaryWindow>>
+) {
+    let window = window_query.get_single().unwrap();
+
+    for mut transform in player_query.iter_mut() {
+        if transform.translation.x + PLAYER_SIZE / 2.0 > window.width() {
+            transform.translation.x = window.width() - PLAYER_SIZE / 2.0;
+        }
+        if transform.translation.x - PLAYER_SIZE / 2.0 < 0.0 {
+            transform.translation.x = PLAYER_SIZE / 2.0;
+        }
+        if transform.translation.y + PLAYER_SIZE / 2.0 > window.height() {
+            transform.translation.y = window.height() - PLAYER_SIZE / 2.0;
+        }
+        if transform.translation.y - PLAYER_SIZE / 2.0 < 0.0 {
+            transform.translation.y = PLAYER_SIZE / 2.0;
+        }
+    }
+}
+
+fn confine_enemies(
+    mut enemy_query: Query<(&mut Transform, &mut Enemy)>,
+    window_query: Query<&Window, With<PrimaryWindow>>
+) {
+    let window = window_query.get_single().unwrap();
+
+    for (mut transform, mut enemy) in enemy_query.iter_mut() {
+        if transform.translation.x + ENEMY_SIZE / 2.0 > window.width() {
+            transform.translation.x = window.width() - ENEMY_SIZE / 2.0;
+            enemy.direction.x = -enemy.direction.x;
+        }
+        if transform.translation.x - ENEMY_SIZE / 2.0 < 0.0 {
+            transform.translation.x = ENEMY_SIZE / 2.0;
+            enemy.direction.x = -enemy.direction.x;
+        }
+        if transform.translation.y + ENEMY_SIZE / 2.0 > window.height() {
+            transform.translation.y = window.height() - ENEMY_SIZE / 2.0;
+            enemy.direction.y = -enemy.direction.y;
+        }
+        if transform.translation.y - ENEMY_SIZE / 2.0 < 0.0 {
+            transform.translation.y = ENEMY_SIZE / 2.0;
+            enemy.direction.y = -enemy.direction.y;
         }
     }
 }
