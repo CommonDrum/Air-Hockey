@@ -11,7 +11,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy))
-        .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies))
+        .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies, collision_detection, animate_scale))
         .run();
 }
 #[derive(Component)]
@@ -206,6 +206,9 @@ fn confine_enemies(
     }
 }
 
+#[derive(Component)]
+struct AnimateScale;
+
 fn collision_detection(
     player_query: Query<&Transform, With<Player>>,
     enemy_query: Query<&Transform, With<Enemy>>,
@@ -215,8 +218,40 @@ fn collision_detection(
     for player_transform in player_query.iter() {
         for enemy_transform in enemy_query.iter() {
             if player_transform.translation.distance(enemy_transform.translation) < PLAYER_SIZE / 2.0 + ENEMY_SIZE / 2.0 {
-                println!("Player collided with enemy");
+
+                let font = asset_server.load("milker.otf");
+
+
+                let text_style = TextStyle {
+                    font: font.clone(),
+                    font_size: 60.0,
+                    color: Color::WHITE,
+                };
+                let text_justification = JustifyText::Right;
+            
+                commands.spawn((
+                    Text2dBundle {
+                        text: Text::from_section("You Lost!", text_style).with_justify(text_justification),
+                        ..default()
+                    },
+                    AnimateScale {},
+                ));            
             }
         }
+    }
+}
+
+fn animate_scale(
+    time: Res<Time>,
+    mut query: Query<&mut Transform, (With<Text>, With<AnimateScale>)>,
+) {
+    // Consider changing font-size instead of scaling the transform. Scaling a Text2D will scale the
+    // rendered quad, resulting in a pixellated look.
+    for mut transform in &mut query {
+        transform.translation = Vec3::new(400.0, 0.0, 0.0);
+
+        let scale = (time.elapsed_seconds().sin() + 1.1) * 2.0;
+        transform.scale.x = scale;
+        transform.scale.y = scale;
     }
 }
