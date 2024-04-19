@@ -195,13 +195,28 @@ fn confine_enemies(
             colided = true;
         }
 
-        if colided {
-        commands.spawn((
-            AudioBundle {
-                source: asset_server.load("pluck.ogg"),
-                settings: PlaybackSettings::DESPAWN,
-            },
-        ));
+       // if colided {
+       // commands.spawn((
+       //     AudioBundle {
+       //         source: asset_server.load("pluck.ogg"),
+       //         settings: PlaybackSettings::DESPAWN,
+       //     },
+       // ));
+       //}
     }
+}
+
+fn collision_detection(
+    player_query: Query<&Transform, With<Player>>,
+    enemy_query: Query<&Transform, With<Enemy>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    for player_transform in player_query.iter() {
+        for enemy_transform in enemy_query.iter() {
+            if player_transform.translation.distance(enemy_transform.translation) < PLAYER_SIZE / 2.0 + ENEMY_SIZE / 2.0 {
+                println!("Player collided with enemy");
+            }
+        }
     }
 }
