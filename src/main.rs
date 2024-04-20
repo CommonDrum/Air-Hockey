@@ -25,7 +25,7 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy, spawn_walls))
-        .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies, collision_detection, shoot ))
+        .add_systems(Update, (player_movement, enemy_movement, collision_detection, shoot ))
         .run();
 }
 #[derive(Component)]
@@ -68,20 +68,19 @@ fn spawn_enemy(
     let x = rand::thread_rng().gen_range(0.0..window.width());
     let y = rand::thread_rng().gen_range(0.0..window.height());
 
-    commands.spawn((
-        SpriteBundle {
-            transform: Transform {
-                scale: Vec3::new(2.0, 2.0, 1.0),
-                translation: Vec3::new(x, y, 0.0),
-                ..default()
-            },
-            texture: asset_server.load("enemy.png"),
-            ..default()
-        },
+    commands.spawn(RigidBody::KinematicPositionBased)
+    .insert(Collider::ball(ENEMY_SIZE / 2.0))
+    .insert(SpriteBundle {
+        transform: Transform::from_xyz(x, y, 0.0),
+        texture: asset_server.load("enemy.png"),
+        ..default()
+    })
+    .insert(TransformBundle::from(Transform::from_xyz(x, y, 0.0)))
+    .insert(
         Enemy {
             direction: Vec3::new(rand::thread_rng().gen_range(-1.0..1.0), rand::thread_rng().gen_range(-1.0..1.0), 0.0).normalize(),
         },
-    ));
+    );
 }
 }
 
@@ -93,19 +92,21 @@ fn spawn_walls(
 
     commands.spawn(RigidBody::Fixed)
     .insert(Collider::cuboid(window.width(), 10.0))
-    .insert(Transform::from_xyz(window.width(), 0.0, 0.0));
+    .insert(TransformBundle::from(Transform::from_xyz(window.width() / 2.0, 0.0, 0.0)));
 
     commands.spawn(RigidBody::Fixed)
     .insert(Collider::cuboid(window.width(), 10.0))
-    .insert(Transform::from_xyz(window.width(), window.width(), 0.0));
+    .insert(TransformBundle::from(Transform::from_xyz(window.width() / 2.0, window.height(), 0.0)));
 
     commands.spawn(RigidBody::Fixed)
     .insert(Collider::cuboid(10.0, window.height()))
-    .insert(Transform::from_xyz(0.0, window.height() / 2.0, 0.0));
+    .insert(TransformBundle::from(Transform::from_xyz(0.0, window.height() / 2.0, 0.0)));
 
     commands.spawn(RigidBody::Fixed)
     .insert(Collider::cuboid(10.0, window.height()))
-    .insert(Transform::from_xyz(window.width(), window.height(), 0.0));
+    .insert(TransformBundle::from(Transform::from_xyz(window.width(), window.height() / 2.0, 0.0)));
+
+
 }
 
 
@@ -185,70 +186,6 @@ fn enemy_movement(
     }
 }
 
-fn confine_player(
-    mut player_query: Query<&mut Transform, With<Player>>,
-    window_query: Query<&Window, With<PrimaryWindow>>
-) {
-    let window = window_query.get_single().unwrap();
-
-    for mut transform in player_query.iter_mut() {
-        if transform.translation.x + PLAYER_SIZE / 2.0 > window.width() {
-            transform.translation.x = window.width() - PLAYER_SIZE / 2.0;
-        }
-        if transform.translation.x - PLAYER_SIZE / 2.0 < 0.0 {
-            transform.translation.x = PLAYER_SIZE / 2.0;
-        }
-        if transform.translation.y + PLAYER_SIZE / 2.0 > window.height() {
-            transform.translation.y = window.height() - PLAYER_SIZE / 2.0;
-        }
-        if transform.translation.y - PLAYER_SIZE / 2.0 < 0.0 {
-            transform.translation.y = PLAYER_SIZE / 2.0;
-        }
-    }
-}
-
-fn confine_enemies(
-    mut enemy_query: Query<(&mut Transform, &mut Enemy)>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
-    let window = window_query.get_single().unwrap();
-
-    let mut colided = false;
-
-    for (mut transform, mut enemy) in enemy_query.iter_mut() {
-        if transform.translation.x + ENEMY_SIZE / 2.0 > window.width() {
-            transform.translation.x = window.width() - ENEMY_SIZE / 2.0;
-            enemy.direction.x = -enemy.direction.x;
-            colided = true;
-        }
-        if transform.translation.x - ENEMY_SIZE / 2.0 < 0.0 {
-            transform.translation.x = ENEMY_SIZE / 2.0;
-            enemy.direction.x = -enemy.direction.x;
-            colided = true;
-        }
-        if transform.translation.y + ENEMY_SIZE / 2.0 > window.height() {
-            transform.translation.y = window.height() - ENEMY_SIZE / 2.0;
-            enemy.direction.y = -enemy.direction.y;
-            colided = true;
-        }
-        if transform.translation.y - ENEMY_SIZE / 2.0 < 0.0 {
-            transform.translation.y = ENEMY_SIZE / 2.0;
-            enemy.direction.y = -enemy.direction.y;
-            colided = true;
-        }
-
-       // if colided {
-       // commands.spawn((
-       //     AudioBundle {
-       //         source: asset_server.load("pluck.ogg"),
-       //         settings: PlaybackSettings::DESPAWN,
-       //     },
-       // ));
-       //}
-    }
-}
 
 #[derive(Component)]
 struct AnimateScale;
