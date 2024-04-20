@@ -5,13 +5,14 @@ use rand::Rng;
 pub const PLAYER_SPEED: f32 = 500.0;
 pub const PLAYER_SIZE: f32 = 50.0;
 pub const ENEMY_SIZE: f32 = 50.0;
+pub const BULLET_SIZE: f32 = 10.0;
 pub const ENEMY_SPEED: f32 = 100.0;
 pub const INITIAL_ENEMY_COUNT: u32 = 4;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy))
-        .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies, collision_detection, animate_scale))
+        .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies, collision_detection ))
         .run();
 }
 #[derive(Component)]
@@ -55,7 +56,11 @@ fn spawn_enemy(
 
     commands.spawn((
         SpriteBundle {
-            transform: Transform::from_xyz(x, y, 0.0),
+            transform: Transform {
+                scale: Vec3::new(2.0, 2.0, 1.0),
+                translation: Vec3::new(x, y, 0.0),
+                ..default()
+            },
             texture: asset_server.load("enemy.png"),
             ..default()
         },
@@ -241,17 +246,5 @@ fn collision_detection(
     }
 }
 
-fn animate_scale(
-    time: Res<Time>,
-    mut query: Query<&mut Transform, (With<Text>, With<AnimateScale>)>,
-) {
-    // Consider changing font-size instead of scaling the transform. Scaling a Text2D will scale the
-    // rendered quad, resulting in a pixellated look.
-    for mut transform in &mut query {
-        transform.translation = Vec3::new(400.0, 0.0, 0.0);
 
-        let scale = (time.elapsed_seconds().sin() + 1.1) * 2.0;
-        transform.scale.x = scale;
-        transform.scale.y = scale;
-    }
-}
+
