@@ -24,7 +24,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
-        .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy))
+        .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy, spawn_walls))
         .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies, collision_detection, shoot ))
         .run();
 }
@@ -83,6 +83,29 @@ fn spawn_enemy(
         },
     ));
 }
+}
+
+fn spawn_walls(
+    mut commands: Commands,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+) {
+    let window = window_query.get_single().unwrap();
+
+    commands.spawn(RigidBody::Fixed)
+    .insert(Collider::cuboid(window.width(), 10.0))
+    .insert(Transform::from_xyz(window.width(), 0.0, 0.0));
+
+    commands.spawn(RigidBody::Fixed)
+    .insert(Collider::cuboid(window.width(), 10.0))
+    .insert(Transform::from_xyz(window.width(), window.width(), 0.0));
+
+    commands.spawn(RigidBody::Fixed)
+    .insert(Collider::cuboid(10.0, window.height()))
+    .insert(Transform::from_xyz(0.0, window.height() / 2.0, 0.0));
+
+    commands.spawn(RigidBody::Fixed)
+    .insert(Collider::cuboid(10.0, window.height()))
+    .insert(Transform::from_xyz(window.width(), window.height(), 0.0));
 }
 
 
