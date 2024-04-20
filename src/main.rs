@@ -1,18 +1,29 @@
+use bevy::input::keyboard;
 use bevy::prelude::*;
+use bevy::render::view::window;
 use bevy::window::PrimaryWindow;
 use rand::Rng;
 
+
+pub const ENEMY_SCALE: f32 = 1.0;
+pub const PLAYER_SCALE: f32 = 1.0;
+pub const BULLET_SCALE: f32 = 1.0;
+
+pub const PLAYER_SIZE: f32 = 50.0 * PLAYER_SCALE;
+pub const BULLET_SIZE: f32 = 10.0 * BULLET_SCALE;
+pub const ENEMY_SIZE: f32 = 50.0 * ENEMY_SCALE;
+
 pub const PLAYER_SPEED: f32 = 500.0;
-pub const PLAYER_SIZE: f32 = 50.0;
-pub const ENEMY_SIZE: f32 = 50.0;
-pub const BULLET_SIZE: f32 = 10.0;
 pub const ENEMY_SPEED: f32 = 100.0;
+
 pub const INITIAL_ENEMY_COUNT: u32 = 4;
+
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy))
-        .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies, collision_detection ))
+        .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies, collision_detection, shoot ))
         .run();
 }
 #[derive(Component)]
@@ -246,5 +257,23 @@ fn collision_detection(
     }
 }
 
+fn shoot(
+    mut commands: Commands,
+    player_query: Query<&Transform, With<Player>>,
+    asset_server: Res<AssetServer>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Space) {
 
+        let player_transform = player_query.get_single().unwrap();
 
+        commands.spawn(SpriteBundle {
+                    transform: Transform {
+                        translation: player_transform.translation,
+                        ..default()
+                    },
+                    texture: asset_server.load("bullet.png"),
+                    ..default()
+                });
+        }
+}
