@@ -1,8 +1,8 @@
-use bevy::input::keyboard;
 use bevy::prelude::*;
-use bevy::render::view::window;
+use bevy_rapier2d::prelude::*;
 use bevy::window::PrimaryWindow;
 use rand::Rng;
+
 
 
 pub const ENEMY_SCALE: f32 = 1.0;
@@ -22,6 +22,8 @@ pub const INITIAL_ENEMY_COUNT: u32 = 4;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
+        .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy))
         .add_systems(Update, (player_movement, enemy_movement, confine_player, confine_enemies, collision_detection, shoot ))
         .run();
@@ -42,15 +44,16 @@ pub fn spawn_player(
 ) {
     let window = window_query.get_single().unwrap();
 
-
-    commands.spawn((
-        SpriteBundle {
-            transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0),
-            texture: asset_server.load("player.png"),
-            ..default()
-        },
-        Player {},
-    ));
+    commands.spawn(RigidBody::KinematicPositionBased)
+    .insert(Collider::ball(PLAYER_SIZE / 2.0))
+    .insert(SpriteBundle {
+        transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0),
+        texture: asset_server.load("player.png"),
+        ..default()
+    })
+    .insert(Player)
+    .insert(TransformBundle::from(Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0)))
+    .insert(KinematicCharacterController::default());
 }
 
 fn spawn_enemy(
@@ -95,7 +98,7 @@ pub fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<Pr
 
 fn player_movement(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut player_query: Query<&mut Transform, With<Player>>,
+    mut player_query: Query<&mut KinematicCharacterController, With<Player>>,
     time: Res<Time>,
 ) {
     if let Ok(mut transform) = player_query.get_single_mut() {
@@ -118,7 +121,9 @@ fn player_movement(
             direction = direction.normalize();
         }
 
-        transform.translation += direction * PLAYER_SPEED * time.delta_seconds();
+        let movement = Some(Vec2::new(direction.x, direction.y) * PLAYER_SPEED * time.delta_seconds());
+
+        transform.translation = movement;
     }
 }
 
