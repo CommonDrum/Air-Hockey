@@ -3,8 +3,6 @@ use bevy_rapier2d::prelude::*;
 use bevy::window::PrimaryWindow;
 use rand::Rng;
 
-
-
 pub const ENEMY_SCALE: f32 = 1.0;
 pub const PLAYER_SCALE: f32 = 1.0;
 pub const BULLET_SCALE: f32 = 1.0;
@@ -25,7 +23,7 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy, spawn_walls))
-        .add_systems(Update, (player_movement, enemy_movement, collision_detection, shoot ))
+        .add_systems(Update, (player_movement, shoot))
         .run();
 }
 #[derive(Component)]
@@ -68,7 +66,7 @@ fn spawn_enemy(
     let x = rand::thread_rng().gen_range(0.0..window.width());
     let y = rand::thread_rng().gen_range(0.0..window.height());
 
-    commands.spawn(RigidBody::KinematicPositionBased)
+    commands.spawn(RigidBody::Dynamic)
     .insert(Collider::ball(ENEMY_SIZE / 2.0))
     .insert(SpriteBundle {
         transform: Transform::from_xyz(x, y, 0.0),
@@ -76,6 +74,12 @@ fn spawn_enemy(
         ..default()
     })
     .insert(TransformBundle::from(Transform::from_xyz(x, y, 0.0)))
+    .insert(GravityScale(0.0))
+    .insert(Restitution::coefficient(0.9))
+    .insert(Velocity {
+        linvel: Vec2::new(x, y).normalize() * ENEMY_SPEED,
+        angvel: 0.4,})
+    .insert(ColliderMassProperties::Density(0.01))
     .insert(
         Enemy {
             direction: Vec3::new(rand::thread_rng().gen_range(-1.0..1.0), rand::thread_rng().gen_range(-1.0..1.0), 0.0).normalize(),
@@ -92,24 +96,26 @@ fn spawn_walls(
 
     commands.spawn(RigidBody::Fixed)
     .insert(Collider::cuboid(window.width(), 10.0))
-    .insert(TransformBundle::from(Transform::from_xyz(window.width() / 2.0, 0.0, 0.0)));
+    .insert(TransformBundle::from(Transform::from_xyz(window.width() / 2.0, 0.0, 0.0)))
+    .insert(Restitution::coefficient(0.7));
 
     commands.spawn(RigidBody::Fixed)
     .insert(Collider::cuboid(window.width(), 10.0))
-    .insert(TransformBundle::from(Transform::from_xyz(window.width() / 2.0, window.height(), 0.0)));
+    .insert(TransformBundle::from(Transform::from_xyz(window.width() / 2.0, window.height(), 0.0)))
+    .insert(Restitution::coefficient(0.7));
 
     commands.spawn(RigidBody::Fixed)
     .insert(Collider::cuboid(10.0, window.height()))
-    .insert(TransformBundle::from(Transform::from_xyz(0.0, window.height() / 2.0, 0.0)));
+    .insert(TransformBundle::from(Transform::from_xyz(0.0, window.height() / 2.0, 0.0)))
+    .insert(Restitution::coefficient(0.7));
 
     commands.spawn(RigidBody::Fixed)
     .insert(Collider::cuboid(10.0, window.height()))
-    .insert(TransformBundle::from(Transform::from_xyz(window.width(), window.height() / 2.0, 0.0)));
+    .insert(TransformBundle::from(Transform::from_xyz(window.width(), window.height() / 2.0, 0.0)))
+    .insert(Restitution::coefficient(0.7));
 
 
 }
-
-
 
 pub fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>) {
     let window = window_query.get_single().unwrap();
@@ -148,77 +154,6 @@ fn player_movement(
         let movement = Some(Vec2::new(direction.x, direction.y) * PLAYER_SPEED * time.delta_seconds());
 
         transform.translation = movement;
-    }
-}
-
-
-fn enemy_movement(
-    mut enemy_query: Query<(&mut Transform, &mut Enemy)>,
-    time: Res<Time>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
-    let window = window_query.get_single().unwrap();
-
-    
-    for (mut transform, mut enemy) in enemy_query.iter_mut() {
-        transform.translation += enemy.direction * ENEMY_SPEED * time.delta_seconds();
-        if transform.translation.x < 0.0 || transform.translation.x > window.width() || transform.translation.y < 0.0 || transform.translation.y > window.height() {
-            
-            if rand::thread_rng().gen_range(0.0..1.0) > 0.5 {
-                enemy.direction.x = -enemy.direction.x;
-            } else {
-                enemy.direction.y = -enemy.direction.y;
-            }
-
-            println!("Enemy out of bounds");
-
-            commands.spawn((
-                AudioBundle {
-                    source: asset_server.load("pluck.ogg"),
-                    settings: PlaybackSettings::DESPAWN,
-                },
-            ));
-        }
-
-           
-    }
-}
-
-
-#[derive(Component)]
-struct AnimateScale;
-
-fn collision_detection(
-    player_query: Query<&Transform, With<Player>>,
-    enemy_query: Query<&Transform, With<Enemy>>,
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
-    for player_transform in player_query.iter() {
-        for enemy_transform in enemy_query.iter() {
-            if player_transform.translation.distance(enemy_transform.translation) < PLAYER_SIZE / 2.0 + ENEMY_SIZE / 2.0 {
-
-                let font = asset_server.load("milker.otf");
-
-
-                let text_style = TextStyle {
-                    font: font.clone(),
-                    font_size: 60.0,
-                    color: Color::WHITE,
-                };
-                let text_justification = JustifyText::Right;
-            
-                commands.spawn((
-                    Text2dBundle {
-                        text: Text::from_section("You Lost!", text_style).with_justify(text_justification),
-                        ..default()
-                    },
-                    AnimateScale {},
-                ));            
-            }
-        }
     }
 }
 
