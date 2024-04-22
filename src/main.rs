@@ -177,3 +177,11 @@ fn shoot(
                 });
         }
 }
+
+
+fn attraction(
+    mut commands: Commands,
+    mut player_query: Query<&mut KinematicCharacterController, With<Player>>,
+
+) {
+}
