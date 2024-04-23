@@ -23,7 +23,7 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy, spawn_walls))
-        .add_systems(Update, (player_movement, shoot))
+        .add_systems(Update, (player_movement, shoot, apply_forces))
         .run();
 }
 #[derive(Component)]
@@ -84,7 +84,11 @@ fn spawn_enemy(
         Enemy {
             direction: Vec3::new(rand::thread_rng().gen_range(-1.0..1.0), rand::thread_rng().gen_range(-1.0..1.0), 0.0).normalize(),
         },
-    );
+    )
+    .insert(ExternalForce {
+        force: Vec2::new(0.0, 0.0),
+        torque: 0.0,
+    });
 }
 }
 
@@ -179,9 +183,14 @@ fn shoot(
 }
 
 
-fn attraction(
-    mut commands: Commands,
-    mut player_query: Query<&mut KinematicCharacterController, With<Player>>,
-
+fn apply_forces(
+    mut ext_forces: Query<&mut ExternalForce>, 
+    mut player_query: Query<&Transform, With<Player>>,
 ) {
+    let player_transform = player_query.get_single().unwrap();
+
+   for mut ext_force in ext_forces.iter_mut() {
+        ext_force.torque = 0.5;
+    }
 }
+
