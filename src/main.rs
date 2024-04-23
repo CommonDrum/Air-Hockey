@@ -14,8 +14,10 @@ pub const ENEMY_SIZE: f32 = 50.0 * ENEMY_SCALE;
 pub const PLAYER_SPEED: f32 = 500.0;
 pub const ENEMY_SPEED: f32 = 100.0;
 
-pub const INITIAL_ENEMY_COUNT: u32 = 4;
+pub const INITIAL_ENEMY_COUNT: u32 = 1;
 
+pub const SHOOT_BASE_STRENGTH: f32 = 1.0;
+pub const PLAYER_RANGE: f32 = 10.0;
 
 fn main() {
     App::new()
@@ -23,16 +25,14 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy, spawn_walls))
-        .add_systems(Update, (player_movement, shoot, apply_forces))
+        .add_systems(Update, (player_movement, apply_forces, shot_system, lock_in))
         .run();
 }
 #[derive(Component)]
 struct Player;
 
 #[derive(Component)]
-struct Enemy{
-    direction: Vec3,
-}
+struct Enemy;
 
 
 pub fn spawn_player(
@@ -78,13 +78,15 @@ fn spawn_enemy(
     .insert(Restitution::coefficient(0.9))
     .insert(ColliderMassProperties::Density(0.01))
     .insert(
-        Enemy {
-            direction: Vec3::new(rand::thread_rng().gen_range(-1.0..1.0), rand::thread_rng().gen_range(-1.0..1.0), 0.0).normalize(),
-        },
+        Enemy {},
     )
     .insert(ExternalForce {
         force: Vec2::new(0.0, 0.0),
         torque: 0.0,
+    })
+    .insert(ExternalImpulse {
+        impulse: Vec2::new(0.0, 0.0),
+        torque_impulse: 0.0,
     });
 }
 }
@@ -158,27 +160,6 @@ fn player_movement(
     }
 }
 
-fn shoot(
-    mut commands: Commands,
-    player_query: Query<&Transform, With<Player>>,
-    asset_server: Res<AssetServer>,
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-) {
-    if keyboard_input.just_pressed(KeyCode::Space) {
-
-        let player_transform = player_query.get_single().unwrap();
-
-        commands.spawn(SpriteBundle {
-                    transform: Transform {
-                        translation: player_transform.translation,
-                        ..default()
-                    },
-                    texture: asset_server.load("bullet.png"),
-                    ..default()
-                });
-        }
-}
-
 fn apply_forces(
     mut enemy_query: Query<(&mut ExternalForce, &Transform), With<Enemy>>,
     player_query: Query<&Transform, With<Player>>
@@ -197,4 +178,40 @@ fn apply_forces(
     }
 }
 
+fn shot_system(
+    mut enemy_query: Query<(&mut ExternalImpulse, &Transform), With<Enemy>>
+    , player_query: Query<&Transform, With<Player>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>
+){
+    let player_transform = player_query.get_single().unwrap();
+    let player_pos = player_transform.translation;
+    
+    if keyboard_input.just_pressed(KeyCode::Space) {
 
+
+        for (mut ext_impulse, enemy_transform) in enemy_query.iter_mut() {
+            let enemy_pos = enemy_transform.translation;
+            let direction = player_pos - enemy_pos;
+            if direction.length() <= PLAYER_SIZE + ENEMY_SIZE + PLAYER_RANGE {
+
+                let direction = direction.normalize_or_zero(); // Use normalize_or_zero to avoid panics if the direction is a zero vector
+                ext_impulse.impulse = Vec2::new(-direction.x, -direction.y) * SHOOT_BASE_STRENGTH;
+            }
+
+       }
+    }
+}
+
+
+
+
+fn lock_in(
+    mut enemy_query: Query<&mut Transform, With<Enemy>>
+){
+
+    let mut enemy_transform = enemy_query.get_single_mut().unwrap();
+        enemy_transform.translation = Vec3::new(100.0,100.0, 0.0);
+    
+
+
+}
