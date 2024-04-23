@@ -76,9 +76,6 @@ fn spawn_enemy(
     .insert(TransformBundle::from(Transform::from_xyz(x, y, 0.0)))
     .insert(GravityScale(0.0))
     .insert(Restitution::coefficient(0.9))
-    .insert(Velocity {
-        linvel: Vec2::new(x, y).normalize() * ENEMY_SPEED,
-        angvel: 0.4,})
     .insert(ColliderMassProperties::Density(0.01))
     .insert(
         Enemy {
@@ -182,15 +179,22 @@ fn shoot(
         }
 }
 
-
 fn apply_forces(
-    mut ext_forces: Query<&mut ExternalForce>, 
-    mut player_query: Query<&Transform, With<Player>>,
+    mut enemy_query: Query<(&mut ExternalForce, &Transform), With<Enemy>>,
+    player_query: Query<&Transform, With<Player>>
 ) {
     let player_transform = player_query.get_single().unwrap();
+    let player_pos = player_transform.translation;
 
-   for mut ext_force in ext_forces.iter_mut() {
-        ext_force.torque = 0.5;
+    for (mut ext_force, enemy_transform) in enemy_query.iter_mut() {
+        let enemy_pos = enemy_transform.translation;
+        let direction = player_pos - enemy_pos;
+
+        let direction = direction.normalize_or_zero(); // Use normalize_or_zero to avoid panics if the direction is a zero vector
+
+        ext_force.force = Vec2::new(direction.x, direction.y) / ENEMY_SPEED;
+        ext_force.torque = 0.0; // Assuming no torque is needed
     }
 }
+
 
