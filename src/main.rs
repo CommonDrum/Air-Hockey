@@ -25,7 +25,7 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy, spawn_walls))
-        .add_systems(Update, ((player_movement, shot_system, lock_in).chain()))
+        .add_systems(Update, ((player_movement, shot_system).chain()))
         .run();
 }
 #[derive(Component)]
@@ -206,28 +206,3 @@ fn shot_system(
 }
 
 
-fn lock_in(
-    mut enemy_query: Query<(&mut Transform, &mut Enemy)>,
-    player_query: Query<&Transform, With<Player>>,
-    keyboard_input: Res<ButtonInput<KeyCode>>
-){
-    let player_transform = player_query.get_single().unwrap();
-    let player_pos = player_transform.translation;
-
-    for (mut enemy_transform, mut enemy) in enemy_query.iter_mut() {
-        let enemy_pos = enemy_transform.translation;
-        let direction = player_pos - enemy_pos;
-
-        if keyboard_input.just_pressed(KeyCode::KeyE) && direction.length() <= PLAYER_SIZE + ENEMY_SIZE + PLAYER_RANGE {
-            enemy.locked = true;
-        } 
-
-        println!("Locked: {}", enemy.locked);
-
-        if enemy.locked {
-            enemy_transform.translation = player_pos;
-        }
-    }
-
-    
-}
