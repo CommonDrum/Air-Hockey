@@ -1,4 +1,3 @@
-use std::f32::consts::E;
 
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
