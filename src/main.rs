@@ -1,3 +1,5 @@
+use std::f32::consts::E;
+
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -14,7 +16,7 @@ pub const ENEMY_SIZE: f32 = 50.0 * ENEMY_SCALE;
 pub const PLAYER_SPEED: f32 = 500.0;
 pub const ENEMY_SPEED: f32 = 100.0;
 
-pub const INITIAL_ENEMY_COUNT: u32 = 10;
+pub const INITIAL_ENEMY_COUNT: u32 = 1;
 
 pub const SHOOT_BASE_STRENGTH: f32 = 1.0;
 pub const PLAYER_RANGE: f32 = 10.0;
@@ -25,17 +27,19 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy, spawn_walls))
-        .add_systems(Update, ((player_movement, shot_system, lock_in).chain()))
+        .add_systems(Update, (player_movement, shot_system, lock_in, keep_next_to_player))
         .run();
 }
 #[derive(Component)]
 struct Player;
 
 #[derive(Component)]
-struct Enemy{
+struct Enemy;
+
+#[derive(Component)]
+struct Lock{
     locked: bool,
 }
-
 
 pub fn spawn_player(
     mut commands: Commands,
@@ -80,7 +84,7 @@ fn spawn_enemy(
     .insert(Restitution::coefficient(0.9))
     .insert(ColliderMassProperties::Density(0.01))
     .insert(
-        Enemy {locked: true},
+        (Enemy{}, Lock{locked: false})
     )
     .insert(ExternalForce {
         force: Vec2::new(0.0, 0.0),
@@ -162,26 +166,8 @@ fn player_movement(
     }
 }
 
-fn apply_forces(
-    mut enemy_query: Query<(&mut ExternalForce, &Transform), With<Enemy>>,
-    player_query: Query<&Transform, With<Player>>
-) {
-    let player_transform = player_query.get_single().unwrap();
-    let player_pos = player_transform.translation;
-
-    for (mut ext_force, enemy_transform) in enemy_query.iter_mut() {
-        let enemy_pos = enemy_transform.translation;
-        let direction = player_pos - enemy_pos;
-
-        let direction = direction.normalize_or_zero(); // Use normalize_or_zero to avoid panics if the direction is a zero vector
-
-        ext_force.force = Vec2::new(direction.x, direction.y) / ENEMY_SPEED;
-        ext_force.torque = 0.0; // Assuming no torque is needed
-    }
-}
-
 fn shot_system(
-    mut enemy_query: Query<(&mut ExternalImpulse, &Transform, &mut Enemy)>,
+    mut enemy_query: Query<(&mut ExternalImpulse, &Transform, &mut Lock)>,
     player_query: Query<&Transform, With<Player>>,
     keyboard_input: Res<ButtonInput<KeyCode>>
 ){
@@ -207,27 +193,37 @@ fn shot_system(
 
 
 fn lock_in(
-    mut enemy_query: Query<(&mut Transform, &mut Enemy)>,
+    mut enemy_query: Query<(& Transform, &mut Lock), With<Enemy>>,
     player_query: Query<&Transform, With<Player>>,
     keyboard_input: Res<ButtonInput<KeyCode>>
 ){
     let player_transform = player_query.get_single().unwrap();
     let player_pos = player_transform.translation;
 
-    for (mut enemy_transform, mut enemy) in enemy_query.iter_mut() {
+    for (enemy_transform, mut enemy) in enemy_query.iter_mut() {
         let enemy_pos = enemy_transform.translation;
         let direction = player_pos - enemy_pos;
-
-        if keyboard_input.just_pressed(KeyCode::KeyE) && direction.length() <= PLAYER_SIZE + ENEMY_SIZE + PLAYER_RANGE {
+        if direction.length() <= PLAYER_SIZE + ENEMY_SIZE + PLAYER_RANGE && keyboard_input.just_pressed(KeyCode::KeyE) {
             enemy.locked = true;
-        } 
-
-        println!("Locked: {}", enemy.locked);
-
-        if enemy.locked {
-            enemy_transform.translation = player_pos;
-        }
+        }   
     }
 
-    
+}
+
+fn keep_next_to_player(
+    mut set: ParamSet<(
+        Query<(&mut Lock, &mut Transform), With<Enemy>>,
+        Query<&Transform, With<Player>>,
+    )>
+){
+    let player_pos = {
+        let player_transform = set.p1().get_single().unwrap().clone(); // Temporarily borrow `set` to get player transform
+        player_transform.translation // Copy the position data
+    };
+
+    for (mut lock, mut transform) in set.p0().iter_mut() { // This is now the only active mutable borrow
+        if lock.locked {
+            transform.translation = player_pos + Vec3::new(PLAYER_SIZE + ENEMY_SIZE, 0.0, 0.0);
+        }
+    }
 }
