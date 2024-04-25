@@ -220,7 +220,7 @@ fn keep_next_to_player(
         player_transform.translation // Copy the position data
     };
 
-    for (mut lock, mut transform) in set.p0().iter_mut() { // This is now the only active mutable borrow
+    for (lock, mut transform) in set.p0().iter_mut() { // This is now the only active mutable borrow
         if lock.locked {
             transform.translation = player_pos + Vec3::new(PLAYER_SIZE + ENEMY_SIZE, 0.0, 0.0);
         }
