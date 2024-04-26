@@ -4,18 +4,18 @@ use bevy_rapier2d::prelude::*;
 use bevy::window::PrimaryWindow;
 use rand::Rng;
 
-pub const ENEMY_SCALE: f32 = 1.0;
+pub const BALL_SCALE: f32 = 1.0;
 pub const PLAYER_SCALE: f32 = 1.0;
 pub const BULLET_SCALE: f32 = 1.0;
 
 pub const PLAYER_SIZE: f32 = 50.0 * PLAYER_SCALE;
 pub const BULLET_SIZE: f32 = 10.0 * BULLET_SCALE;
-pub const ENEMY_SIZE: f32 = 50.0 * ENEMY_SCALE;
+pub const BALL_SIZE: f32 = 50.0 * BALL_SCALE;
 
 pub const PLAYER_SPEED: f32 = 500.0;
-pub const ENEMY_SPEED: f32 = 100.0;
+pub const BALL_SPEED: f32 = 100.0;
 
-pub const INITIAL_ENEMY_COUNT: u32 = 1;
+pub const INITIAL_BALL_COUNT: u32 = 1;
 
 pub const SHOOT_BASE_STRENGTH: f32 = 1.0;
 pub const PLAYER_RANGE: f32 = 10.0;
@@ -25,7 +25,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
-        .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_enemy, spawn_walls))
+        .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_ball, spawn_walls))
         .add_systems(Update, (player_movement, shot_system, lock_in, keep_next_to_player))
         .run();
 }
@@ -33,7 +33,7 @@ fn main() {
 struct Player;
 
 #[derive(Component)]
-struct Enemy;
+struct Ball;
 
 #[derive(Component)]
 struct Lock{
@@ -59,23 +59,23 @@ pub fn spawn_player(
     .insert(KinematicCharacterController::default());
 }
 
-fn spawn_enemy(
+fn spawn_ball(
     mut commands: Commands,
     window_query: Query<&Window, With<PrimaryWindow>>,
     asset_server: Res<AssetServer>,
 ) {
     let window = window_query.get_single().unwrap();
 
-    for _ in 0..INITIAL_ENEMY_COUNT {
+    for _ in 0..INITIAL_BALL_COUNT {
 
     let x = rand::thread_rng().gen_range(0.0..window.width());
     let y = rand::thread_rng().gen_range(0.0..window.height());
 
     commands.spawn(RigidBody::Dynamic)
-    .insert(Collider::ball(ENEMY_SIZE / 2.0))
+    .insert(Collider::ball(BALL_SIZE / 2.0))
     .insert(SpriteBundle {
         transform: Transform::from_xyz(x, y, 0.0),
-        texture: asset_server.load("enemy.png"),
+        texture: asset_server.load("ball.png"),
         ..default()
     })
     .insert(TransformBundle::from(Transform::from_xyz(x, y, 0.0)))
@@ -83,7 +83,7 @@ fn spawn_enemy(
     .insert(Restitution::coefficient(0.9))
     .insert(ColliderMassProperties::Density(0.01))
     .insert(
-        (Enemy{}, Lock{locked: false})
+        (Ball{}, Lock{locked: false})
     )
     .insert(ExternalForce {
         force: Vec2::new(0.0, 0.0),
@@ -92,7 +92,8 @@ fn spawn_enemy(
     .insert(ExternalImpulse {
         impulse: Vec2::new(0.0, 0.0),
         torque_impulse: 0.0,
-    });
+    })
+    .insert(Velocity::default());
 }
 }
 
@@ -166,7 +167,7 @@ fn player_movement(
 }
 
 fn shot_system(
-    mut enemy_query: Query<(&mut ExternalImpulse, &Transform, &mut Lock)>,
+    mut ball_query: Query<(&mut ExternalImpulse, &Transform, &mut Lock)>,
     player_query: Query<&Transform, With<Player>>,
     keyboard_input: Res<ButtonInput<KeyCode>>
 ){
@@ -176,13 +177,13 @@ fn shot_system(
     if keyboard_input.just_pressed(KeyCode::Space) {
 
 
-        for (mut ext_impulse, enemy_transform, mut enemy) in enemy_query.iter_mut() {
-            enemy.locked = false;
-            let enemy_pos = enemy_transform.translation;
-            let direction = player_pos - enemy_pos;
-            if direction.length() <= PLAYER_SIZE + ENEMY_SIZE + PLAYER_RANGE {
+        for (mut ext_impulse, ball_transform, mut ball) in ball_query.iter_mut() {
+            ball.locked = false;
+            let ball_pos = ball_transform.translation;
+            let direction = player_pos - ball_pos;
+            if direction.length() <= PLAYER_SIZE + BALL_SIZE + PLAYER_RANGE {
 
-                let direction = direction.normalize_or_zero(); // Use normalize_or_zero to avoid panics if the direction is a zero vector
+                let direction = direction.normalize_or_zero(); 
                 ext_impulse.impulse = Vec2::new(-direction.x, -direction.y) * SHOOT_BASE_STRENGTH;
             }
 
@@ -192,18 +193,21 @@ fn shot_system(
 
 
 fn lock_in(
-    mut enemy_query: Query<(& Transform, &mut Lock), With<Enemy>>,
+    mut ball_query: Query<(& Transform, &mut Lock, &mut Velocity), With<Ball>>,
     player_query: Query<&Transform, With<Player>>,
     keyboard_input: Res<ButtonInput<KeyCode>>
 ){
     let player_transform = player_query.get_single().unwrap();
     let player_pos = player_transform.translation;
 
-    for (enemy_transform, mut enemy) in enemy_query.iter_mut() {
-        let enemy_pos = enemy_transform.translation;
-        let direction = player_pos - enemy_pos;
-        if direction.length() <= PLAYER_SIZE + ENEMY_SIZE + PLAYER_RANGE && keyboard_input.just_pressed(KeyCode::KeyE) {
-            enemy.locked = true;
+    for (ball_transform, mut ball, mut vel) in ball_query.iter_mut() {
+        let ball_pos = ball_transform.translation;
+        let direction = player_pos - ball_pos;
+        if direction.length() <= PLAYER_SIZE + BALL_SIZE + PLAYER_RANGE && keyboard_input.just_pressed(KeyCode::KeyE) {
+            vel.linvel = Vec2::ZERO;
+            vel.angvel = 0.0;
+            ball.locked = true;
+            
         }   
     }
 
@@ -211,18 +215,18 @@ fn lock_in(
 
 fn keep_next_to_player(
     mut set: ParamSet<(
-        Query<(&mut Lock, &mut Transform), With<Enemy>>,
+        Query<(&mut Lock, &mut Transform), With<Ball>>,
         Query<&Transform, With<Player>>,
     )>
 ){
     let player_pos = {
-        let player_transform = set.p1().get_single().unwrap().clone(); // Temporarily borrow `set` to get player transform
-        player_transform.translation // Copy the position data
+        let player_transform = set.p1().get_single().unwrap().clone(); 
+        player_transform.translation 
     };
 
-    for (lock, mut transform) in set.p0().iter_mut() { // This is now the only active mutable borrow
+    for (lock, mut transform) in set.p0().iter_mut() { 
         if lock.locked {
-            transform.translation = player_pos + Vec3::new(PLAYER_SIZE + ENEMY_SIZE, 0.0, 0.0);
+            transform.translation = player_pos + Vec3::new(PLAYER_SIZE + BALL_SIZE, 0.0, 0.0);
         }
     }
 }
