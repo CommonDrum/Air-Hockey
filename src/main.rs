@@ -54,7 +54,7 @@ pub fn spawn_player(
     commands.spawn(RigidBody::KinematicPositionBased)
     .insert(Collider::ball(PLAYER_SIZE / 2.0))
     .insert(SpriteBundle {
-        transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0),
+        transform: Transform::from_xyz(window.width() / 3.0, window.height() / 2.0, 0.0),
         texture: asset_server.load("player.png"),
         ..default()
     })
