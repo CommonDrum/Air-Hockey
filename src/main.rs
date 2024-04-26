@@ -8,9 +8,8 @@ pub const BALL_SCALE: f32 = 1.0;
 pub const PLAYER_SCALE: f32 = 1.0;
 pub const BULLET_SCALE: f32 = 1.0;
 
-pub const PLAYER_SIZE: f32 = 50.0 * PLAYER_SCALE;
-pub const BULLET_SIZE: f32 = 10.0 * BULLET_SCALE;
-pub const BALL_SIZE: f32 = 50.0 * BALL_SCALE;
+pub const PLAYER_SIZE: f32 = 60.0 * PLAYER_SCALE;
+pub const BALL_SIZE: f32 = 70.0 * BALL_SCALE;
 
 pub const PLAYER_SPEED: f32 = 500.0;
 pub const BALL_SPEED: f32 = 100.0;
@@ -26,7 +25,7 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_ball, spawn_walls))
-        .add_systems(Update, (player_movement, shot_system, lock_in, keep_next_to_player))
+        .add_systems(Update, (player_movement, shot_system, lock_in, keep_next_to_player, score))
         .run();
 }
 #[derive(Component)]
@@ -38,6 +37,11 @@ struct Ball;
 #[derive(Component)]
 struct Lock{
     locked: bool,
+}
+
+#[derive(Component)]
+struct ScoreText{
+    score: u32,
 }
 
 pub fn spawn_player(
@@ -122,17 +126,43 @@ fn spawn_walls(
     .insert(Collider::cuboid(10.0, window.height()))
     .insert(TransformBundle::from(Transform::from_xyz(window.width(), window.height() / 2.0, 0.0)))
     .insert(Restitution::coefficient(0.7));
-
-
 }
 
-pub fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>) {
+pub fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>, asset_server: Res<AssetServer>) {
     let window = window_query.get_single().unwrap();
 
     commands.spawn(Camera2dBundle {
         transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0),
         ..default()
     });
+
+    commands.spawn((
+        TextBundle::from_sections([
+            TextSection::new(
+                "SCORE: ",
+                TextStyle {
+                    font: asset_server.load("Milker.otf"),
+                    font_size: 60.0,
+                    ..default()
+                },
+            ),
+            TextSection::from_style(if cfg!(feature = "default_font") {
+                TextStyle {
+                    font_size: 60.0,
+                    color: Color::GOLD,
+                    ..default()
+                }
+            } else {
+                TextStyle {
+                    font: asset_server.load("Milker.otf"),
+                    font_size: 60.0,
+                    color: Color::GOLD,
+                }
+            }),
+        ]),
+        ScoreText{score: 0},
+    ));
+
 }
 
 fn player_movement(
@@ -229,4 +259,27 @@ fn keep_next_to_player(
             transform.translation = player_pos + Vec3::new(PLAYER_SIZE + BALL_SIZE, 0.0, 0.0);
         }
     }
+}
+
+
+
+fn score(
+    ball_query: Query<&Transform, With<Ball>>,
+    mut score_query: Query<(&mut ScoreText, &mut Text)>,
+    
+){
+
+    let mut score = 0;
+    for ball_transform in ball_query.iter() {
+        let ball_pos = ball_transform.translation;
+        if ball_pos.x < 0.0 || ball_pos.x > 800.0 || ball_pos.y < 0.0 || ball_pos.y > 600.0 {
+            score += 1;
+        }
+    }
+
+    for (mut score_text, mut text) in score_query.iter_mut() {
+        score_text.score += score;
+        text.sections[1].value = score_text.score.to_string();
+    }
+    
 }
