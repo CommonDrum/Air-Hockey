@@ -16,7 +16,7 @@ pub const BALL_SPEED: f32 = 100.0;
 
 pub const INITIAL_BALL_COUNT: u32 = 1;
 
-pub const SHOOT_BASE_STRENGTH: f32 = 1.0;
+pub const SHOOT_BASE_STRENGTH: f32 = 5.0;
 pub const PLAYER_RANGE: f32 = 10.0;
 
 fn main() {
@@ -58,7 +58,7 @@ pub fn spawn_player(
     commands.spawn(RigidBody::KinematicPositionBased)
     .insert(Collider::ball(PLAYER_SIZE / 2.0))
     .insert(SpriteBundle {
-        transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0),
+        transform: Transform::from_xyz(window.width() / 3.0, window.height() / 2.0, 0.0),
         texture: asset_server.load("player.png"),
         ..default()
     })
@@ -111,27 +111,49 @@ fn spawn_walls(
 ) {
     let window = window_query.get_single().unwrap();
 
-    commands.spawn(RigidBody::Fixed)
-    .insert(Collider::cuboid(window.width(), 10.0))
-    .insert(TransformBundle::from(Transform::from_xyz(window.width() / 2.0, 0.0, 0.0)))
-    .insert(Restitution::coefficient(0.7));
+    let wall_thickness = 10.0;
+    let width = window.width();
+    let height = window.height();
+    let goal_size = 100.0;
+    let restitution =   0.8; 
 
-    commands.spawn(RigidBody::Fixed)
-    .insert(Collider::cuboid(window.width(), 10.0))
-    .insert(TransformBundle::from(Transform::from_xyz(window.width() / 2.0, window.height(), 0.0)))
-    .insert(Restitution::coefficient(0.7));
+    //left bottom wall  
+     commands.spawn(RigidBody::Fixed)
+    .insert(Collider::cuboid(wall_thickness , height / 4.0))
+    .insert(TransformBundle::from(Transform::from_xyz(0.0, (height / 4.0) - goal_size, 0.0)))
+    .insert(Restitution::coefficient(restitution));
 
+    //left top wall
     commands.spawn(RigidBody::Fixed)
-    .insert(Collider::cuboid(10.0, window.height()))
-    .insert(TransformBundle::from(Transform::from_xyz(0.0, window.height() / 2.0, 0.0)))
-    .insert(Restitution::coefficient(0.7));
+    .insert(Collider::cuboid(wall_thickness , height / 4.0))
+    .insert(TransformBundle::from(Transform::from_xyz(0.0, (height / 4.0 * 3.0) + goal_size, 0.0)))
+    .insert(Restitution::coefficient(restitution));
 
+    //right bottom wall
     commands.spawn(RigidBody::Fixed)
-    .insert(Collider::cuboid(10.0, window.height()))
-    .insert(TransformBundle::from(Transform::from_xyz(window.width(), window.height() / 2.0, 0.0)))
-    .insert(Restitution::coefficient(0.7));
+    .insert(Collider::cuboid(wall_thickness , height / 4.0))
+    .insert(TransformBundle::from(Transform::from_xyz(width, (height / 4.0) - goal_size, 0.0)))
+    .insert(Restitution::coefficient(restitution));
+
+    //right top wall
+    commands.spawn(RigidBody::Fixed)
+    .insert(Collider::cuboid(wall_thickness , height / 4.0))
+    .insert(TransformBundle::from(Transform::from_xyz(width, (height / 4.0 * 3.0) + goal_size, 0.0)))
+    .insert(Restitution::coefficient(restitution));
+
+    //top wall
+    commands.spawn(RigidBody::Fixed)
+    .insert(Collider::cuboid(width, wall_thickness))
+    .insert(TransformBundle::from(Transform::from_xyz(width / 2.0, height, 0.0)))
+    .insert(Restitution::coefficient(restitution));
+
+    //bottom wall
+    commands.spawn(RigidBody::Fixed)
+    .insert(Collider::cuboid(width, wall_thickness))
+    .insert(TransformBundle::from(Transform::from_xyz(width / 2.0, 0.0, 0.0)))
+    .insert(Restitution::coefficient(restitution));
+
 }
-
 pub fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>, asset_server: Res<AssetServer>) {
     let window = window_query.get_single().unwrap();
 
@@ -140,6 +162,7 @@ pub fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<Pr
         ..default()
     });
 
+    // For now text init lives here with the camera
     commands.spawn((
         TextBundle::from_sections([
             TextSection::new(
@@ -270,21 +293,21 @@ fn keep_next_to_player(
 fn score(
     ball_query: Query<(&Transform, Entity), With<Ball>>,
     mut score_query: Query<(&mut ScoreText, &mut Text)>,
-    mut out_of_bounds_events: EventWriter<OutOfBoundsEvent>,
     
 ){
-
+    // add 1 to score if ball is out of bounds
+    let window = window_query.get_single().unwrap();
     let mut score = 0;
     for (ball_transform, entity) in ball_query.iter() {
         let ball_pos = ball_transform.translation;
-        if ball_pos.x < 0.0 || ball_pos.x > 800.0 || ball_pos.y < 0.0 || ball_pos.y > 600.0 {
+        if ball_pos.x < 0.0 || ball_pos.x > window.width() || ball_pos.y < 0.0 || ball_pos.y > window.height() {
             score += 1;
             out_of_bounds_events.send(OutOfBoundsEvent(entity));
         }
     }
 
     for (mut score_text, mut text) in score_query.iter_mut() {
-        score_text.score += score;
+        score_text.score = score;
         text.sections[1].value = score_text.score.to_string();
     }
     
