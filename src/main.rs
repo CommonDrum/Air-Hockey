@@ -25,7 +25,8 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_ball, spawn_walls))
-        .add_systems(Update, (player_movement, shot_system, lock_in, keep_next_to_player, score))
+        .add_systems(Update, (player_movement, shot_system, lock_in, keep_next_to_player, score, reset_out_of_bounds))
+        .add_event::<OutOfBoundsEvent>()
         .run();
 }
 #[derive(Component)]
@@ -43,6 +44,9 @@ struct Lock{
 struct ScoreText{
     score: u32,
 }
+
+#[derive(Event)]
+struct OutOfBoundsEvent(Entity);
 
 pub fn spawn_player(
     mut commands: Commands,
@@ -264,16 +268,18 @@ fn keep_next_to_player(
 
 
 fn score(
-    ball_query: Query<&Transform, With<Ball>>,
+    ball_query: Query<(&Transform, Entity), With<Ball>>,
     mut score_query: Query<(&mut ScoreText, &mut Text)>,
+    mut out_of_bounds_events: EventWriter<OutOfBoundsEvent>,
     
 ){
 
     let mut score = 0;
-    for ball_transform in ball_query.iter() {
+    for (ball_transform, entity) in ball_query.iter() {
         let ball_pos = ball_transform.translation;
         if ball_pos.x < 0.0 || ball_pos.x > 800.0 || ball_pos.y < 0.0 || ball_pos.y > 600.0 {
             score += 1;
+            out_of_bounds_events.send(OutOfBoundsEvent(entity));
         }
     }
 
@@ -282,4 +288,16 @@ fn score(
         text.sections[1].value = score_text.score.to_string();
     }
     
+}
+
+
+fn reset_out_of_bounds(
+    mut commands: Commands,
+    mut out_of_bounds_events: EventReader<OutOfBoundsEvent>,
+){
+    for event in out_of_bounds_events.read() {
+        let entity = event.0;
+        print!("Entity: {:?}", entity);
+        commands.entity(entity).despawn();
+    }
 }
