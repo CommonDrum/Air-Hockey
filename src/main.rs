@@ -1,5 +1,5 @@
 
-use bevy::prelude::*;
+use bevy::{asset, prelude::*};
 use bevy_rapier2d::prelude::*;
 use bevy::window::PrimaryWindow;
 use rand::Rng;
@@ -25,8 +25,9 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_ball, spawn_walls))
-        .add_systems(Update, (player_movement, shot_system, lock_in, keep_next_to_player, score, reset_out_of_bounds))
+        .add_systems(Update, (player_movement, shot_system, lock_in, keep_next_to_player, score, reset_out_of_bounds, spawn_ball_e))
         .add_event::<OutOfBoundsEvent>()
+        .add_event::<SpawnBallEvent>()
         .run();
 }
 #[derive(Component)]
@@ -47,6 +48,9 @@ struct ScoreText{
 
 #[derive(Event)]
 struct OutOfBoundsEvent(Entity);
+
+#[derive(Event)]
+struct SpawnBallEvent(Vec2);
 
 pub fn spawn_player(
     mut commands: Commands,
@@ -293,6 +297,8 @@ fn keep_next_to_player(
 fn score(
     ball_query: Query<(&Transform, Entity), With<Ball>>,
     mut score_query: Query<(&mut ScoreText, &mut Text)>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    mut out_of_bounds_events: EventWriter<OutOfBoundsEvent>,
     
 ){
     // add 1 to score if ball is out of bounds
@@ -317,10 +323,49 @@ fn score(
 fn reset_out_of_bounds(
     mut commands: Commands,
     mut out_of_bounds_events: EventReader<OutOfBoundsEvent>,
+    mut spawn_ball_event: EventWriter<SpawnBallEvent>,
+    window_query: Query<&Window, With<PrimaryWindow>>
 ){
+    let window = window_query.get_single().unwrap();
     for event in out_of_bounds_events.read() {
         let entity = event.0;
         print!("Entity: {:?}", entity);
         commands.entity(entity).despawn();
+        spawn_ball_event.send(SpawnBallEvent(Vec2::new(rand::thread_rng().gen_range(0.0..window.width()), rand::thread_rng().gen_range(0.0..window.height()))));
+    }
+}
+
+
+fn spawn_ball_e(
+    mut commands: Commands,
+    mut spawn_ball_events : EventReader<SpawnBallEvent>,
+    asset_server: Res<AssetServer>,
+){
+    for ev in spawn_ball_events.read(){
+        let position = ev.0;
+        commands.spawn(RigidBody::Dynamic)
+        .insert(Collider::ball(BALL_SIZE / 2.0))
+        .insert(SpriteBundle {
+            transform: Transform::from_xyz(position.x, position.y, 0.0),
+            texture: asset_server.load("ball.png"),
+            ..default()
+        })
+        .insert(TransformBundle::from(Transform::from_xyz(position.x, position.y, 0.0)))
+        .insert(GravityScale(0.0))
+        .insert(Restitution::coefficient(0.9))
+        .insert(ColliderMassProperties::Density(0.01))
+        .insert(
+            (Ball{}, Lock{locked: false})
+        )
+        .insert(ExternalForce {
+            force: Vec2::new(0.0, 0.0),
+            torque: 0.0,
+        })
+        .insert(ExternalImpulse {
+            impulse: Vec2::new(0.0, 0.0),
+            torque_impulse: 0.0,
+        })
+        .insert(Velocity::default());
+        
     }
 }
