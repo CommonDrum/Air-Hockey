@@ -8,8 +8,9 @@ pub const BALL_SCALE: f32 = 1.0;
 pub const PLAYER_SCALE: f32 = 1.0;
 pub const BULLET_SCALE: f32 = 1.0;
 
-pub const PLAYER_SIZE: f32 = 60.0 * PLAYER_SCALE;
-pub const BALL_SIZE: f32 = 70.0 * BALL_SCALE;
+// Sizes as percentages of the window size
+pub const PLAYER_SIZE: f32 = 0.1;
+pub const BALL_SIZE: f32 = 0.05;
 
 pub const PLAYER_SPEED: f32 = 500.0;
 pub const BALL_SPEED: f32 = 100.0;
@@ -19,12 +20,15 @@ pub const INITIAL_BALL_COUNT: u32 = 1;
 pub const SHOOT_BASE_STRENGTH: f32 = 5.0;
 pub const PLAYER_RANGE: f32 = 10.0;
 
+pub const BACKGROUND_PADDING_X: f32 = 100.0;
+pub const BACKGROUND_PADDING_Y: f32 = 100.0;
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugins(RapierDebugRenderPlugin::default())
-        .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_ball, spawn_walls))
+        .add_systems(Startup, ((spawn_player, spawn_camera).chain(), spawn_ball, spawn_walls, background_setup))
         .add_systems(Update, (player_movement, shot_system, lock_in, keep_next_to_player, score, reset_out_of_bounds, spawn_ball_e))
         .add_event::<OutOfBoundsEvent>()
         .add_event::<SpawnBallEvent>()
@@ -59,11 +63,17 @@ pub fn spawn_player(
 ) {
     let window = window_query.get_single().unwrap();
 
+    let player_size = window.width() * PLAYER_SIZE;
+
     commands.spawn(RigidBody::KinematicPositionBased)
-    .insert(Collider::ball(PLAYER_SIZE / 2.0))
+    .insert(Collider::ball(player_size / 2.0))
     .insert(SpriteBundle {
         transform: Transform::from_xyz(window.width() / 3.0, window.height() / 2.0, 0.0),
         texture: asset_server.load("player.png"),
+        sprite: Sprite {
+            custom_size: Some(Vec2::new(player_size, player_size)),
+            ..Default::default()
+        },
         ..default()
     })
     .insert(Player)
@@ -83,9 +93,15 @@ fn spawn_ball(
     let x = rand::thread_rng().gen_range(0.0..window.width());
     let y = rand::thread_rng().gen_range(0.0..window.height());
 
+    let ball_size = y * BALL_SIZE;
+
     commands.spawn(RigidBody::Dynamic)
-    .insert(Collider::ball(BALL_SIZE / 2.0))
+    .insert(Collider::ball(ball_size / 2.0))
     .insert(SpriteBundle {
+        sprite: Sprite {
+            custom_size: Some(Vec2::new(ball_size, ball_size)),
+            ..Default::default()
+        },
         transform: Transform::from_xyz(x, y, 0.0),
         texture: asset_server.load("ball.png"),
         ..default()
@@ -118,7 +134,7 @@ fn spawn_walls(
     let wall_thickness = 10.0;
     let width = window.width();
     let height = window.height();
-    let goal_size = 100.0;
+    let goal_size = 200.0;
     let restitution =   0.8; 
 
     //left bottom wall  
@@ -226,6 +242,28 @@ fn player_movement(
         transform.translation = movement;
     }
 }
+
+fn background_setup(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+) {
+    let window = window_query.get_single().unwrap();
+
+    commands.spawn(SpriteBundle {
+        texture: asset_server.load("png/table.png"),
+        transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, -1.0),
+        sprite: Sprite {
+            custom_size: Some(Vec2::new(window.width() + BACKGROUND_PADDING_X, window.height() + BACKGROUND_PADDING_Y)),
+            ..default()
+        },
+
+        ..Default::default()
+    });
+}
+
+
+
 
 fn shot_system(
     mut ball_query: Query<(&mut ExternalImpulse, &Transform, &mut Lock)>,
