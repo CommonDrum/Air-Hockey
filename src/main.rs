@@ -1,5 +1,5 @@
 
-use bevy::{asset, prelude::*};
+use bevy::{asset, ecs::entity::Entities, prelude::*};
 use bevy_rapier2d::prelude::*;
 use bevy::window::PrimaryWindow;
 use rand::Rng;
@@ -10,7 +10,8 @@ pub const BULLET_SCALE: f32 = 1.0;
 
 // Sizes as percentages of the window size
 pub const PLAYER_SIZE: f32 = 0.1;
-pub const BALL_SIZE: f32 = 0.05;
+pub const BALL_SIZE: f32 = 0.08;
+pub const GOAL_SIZE: f32 = 0.2;
 
 pub const PLAYER_SPEED: f32 = 500.0;
 pub const BALL_SPEED: f32 = 100.0;
@@ -134,7 +135,7 @@ fn spawn_walls(
     let wall_thickness = 10.0;
     let width = window.width();
     let height = window.height();
-    let goal_size = 200.0;
+    let goal_size = 100.0;
     let restitution =   0.8; 
 
     //left bottom wall  
@@ -362,14 +363,18 @@ fn reset_out_of_bounds(
     mut commands: Commands,
     mut out_of_bounds_events: EventReader<OutOfBoundsEvent>,
     mut spawn_ball_event: EventWriter<SpawnBallEvent>,
-    window_query: Query<&Window, With<PrimaryWindow>>
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    entities: Query<Entity, With<Ball>>,
 ){
     let window = window_query.get_single().unwrap();
     for event in out_of_bounds_events.read() {
         let entity = event.0;
         print!("Entity: {:?}", entity);
-        commands.entity(entity).despawn();
-        spawn_ball_event.send(SpawnBallEvent(Vec2::new(rand::thread_rng().gen_range(0.0..window.width()), rand::thread_rng().gen_range(0.0..window.height()))));
+        if entities.get(entity).is_ok() {
+            commands.entity(entity).despawn();
+            spawn_ball_event.send(SpawnBallEvent(Vec2::new(rand::thread_rng().gen_range(0.0..window.width()), rand::thread_rng().gen_range(0.0..window.height()))));
+        }
+    
     }
 }
 
