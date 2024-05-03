@@ -383,12 +383,19 @@ fn spawn_ball_e(
     mut commands: Commands,
     mut spawn_ball_events : EventReader<SpawnBallEvent>,
     asset_server: Res<AssetServer>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
 ){
     for ev in spawn_ball_events.read(){
         let position = ev.0;
+        let window = window_query.get_single().unwrap();
+        let ball_size = window.width() * BALL_SIZE;
         commands.spawn(RigidBody::Dynamic)
-        .insert(Collider::ball(BALL_SIZE / 2.0))
+        .insert(Collider::ball(ball_size / 2.0))
         .insert(SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(ball_size, ball_size)),
+                ..Default::default()
+            },
             transform: Transform::from_xyz(position.x, position.y, 0.0),
             texture: asset_server.load("ball.png"),
             ..default()
@@ -409,6 +416,6 @@ fn spawn_ball_e(
             torque_impulse: 0.0,
         })
         .insert(Velocity::default());
-        
     }
+
 }
