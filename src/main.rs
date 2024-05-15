@@ -36,7 +36,10 @@ fn main() {
         .run();
 }
 #[derive(Component)]
-struct Player;
+struct Player{
+    id: i32,
+}
+
 
 #[derive(Component)]
 struct Ball;
@@ -77,7 +80,7 @@ pub fn spawn_player(
         },
         ..default()
     })
-    .insert(Player)
+    .insert(Player{id : 1})
     .insert(TransformBundle::from(Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0)))
     .insert(KinematicCharacterController::default());
 }
